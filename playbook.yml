@@ -1,0 +1,58 @@
+- hosts: webservers
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: create user ansible-worker
+      ansible.builtin.user:
+        name: ansible-worker
+        state: present
+
+    - name: install git
+      ansible.builtin.apt:
+        name: git
+        state: present
+
+    - name: copy keys
+      ansible.builtin.copy:
+        src: ssh_keys/
+        dest: /home/ansible-worker/.ssh/
+        owner: ansible-worker
+
+    - name: set authorized key 
+      ansible.posix.authorized_key:
+        user: ansible-worker
+        state: present
+        key: "{{ lookup('file', '/home/ansible-worker/.ssh/id_rsa.pub') }}"
+
+    - name: clone git repo
+      ansible.builtin.git:
+        repo: https://github.com/iphilka/stud-template.git
+        dest: /home/ansible-worker/www/stud-template
+        clone: yes
+        update: no
+
+    - name: change html
+      ansible.builtin.copy:
+        src: index.html
+        dest: /home/ansible-worker/www/stud-template/index.html
+
+    - name: install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: copy iphilka.ru.conf
+      ansible.builtin.copy:
+        src: ansible.iphilka.ru.conf
+        dest: /etc/nginx/sites-available/ansible.iphilka.ru
+
+    - name: create link
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/ansible.iphilka.ru
+        dest: /etc/nginx/sites-enabled/ansible.iphilka.ru
+        state: link
+
+    - name: restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
